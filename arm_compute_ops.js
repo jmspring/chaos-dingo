@@ -10,7 +10,6 @@ var exports = module.exports = {};
 function performVmOperation(operation, credentials, subscriptionId, resourceGroup, resource, callback) {
     if(credentials && resourceGroup && resource) {
         var client = new ComputeManagementClient(credentials, subscriptionId);
-        console.log(callback);
         if(operation === 'restart') {
             client.virtualMachines.restart(resourceGroup, resource, callback);
         } else if(operation === 'start') {

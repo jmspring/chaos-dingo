@@ -67,6 +67,7 @@ switch(options.operation) {
 
 var client;
 var response;
+var credentials;
 var context = new adalNode.AuthenticationContext(azureConstants.AUTHORIZATION_ENDPOINT + options.tenant);
 async.series([
     function (next) {
@@ -80,21 +81,21 @@ async.series([
         });
     },
     function (next) {
-        var credentials = new azureCommon.TokenCloudCredentials({
+        credentials = new azureCommon.TokenCloudCredentials({
             subscriptionId : options.subscription,
             authorizationScheme : response.tokenType,
             token : response.accessToken
         });
 
-        client = new ComputeManagementClient(credentials, options.subscription);
         next();
     },
     function (next) {
-        client.virtualMachines.restart(options.resourcegrp, 
-                                       options.resource, 
-                                       function(err, result){
-            console.log(result);
-            if (err) throw err;            
+        vmFunction(credentials, options.resourcegrp, options.resource, function(err, result) {
+            if(err) {
+                throw err;            
+            } else {
+                console.log("Operation " + options.operation + " succeeded.");
+            }
         });
     }
 ]);
