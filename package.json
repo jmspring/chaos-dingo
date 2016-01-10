@@ -1,0 +1,35 @@
+{
+  "name": "chaos-dingo",
+  "version": "0.1.0",
+  "description": "A tool to mess with Azure services leveraging the Azure NodeJS sdks.",
+  "main": "dingo.js",
+  "scripts": {
+    "start": "node dingo.js"
+  },
+  "dependencies": {
+    "azure-arm-compute": "git://github.com/jmspring/computeManagement2.git#master",
+    "async": "*",
+    "azure-common": "*",
+    "ms-rest": "*",
+    "ms-rest-azure": "*",
+    "adal-node": ">= 0.1.17",
+    "yargs": ">= 3.31.0"
+  },
+  "engines": {
+    "node": ">= 5.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jmspring/chaos-dingo"
+  },
+  "keywords": [
+    "azure",
+    "chaos monkey",
+    "testing",
+    "dingo"
+  ],
+  "author": "Jim Spring",
+  "contributors": [
+  ],
+  "license": "MIT"
+}
