@@ -39,6 +39,7 @@ var options = require('yargs')
     .option('r', { alias: 'resource', describe: 'The name of the resource to operate on.', type: 'string' } )
     .option('a', { alias: 'randomresource', describe: 'Choose a resource at random from the resource group.  (Limited to VMs)', type: 'boolean' })
     .option('o', { alias: 'operation', describe: 'The operation to perform on the specified resource.  Possible are: start, stop, restart.', demand: true, type: 'string' })
+    .option('m', { alias: 'resourcematch', describe: 'A regular expression to match / filter the list of random resources.', type: 'string' })
     .help('?')
     .alias('?', 'help')
     .argv;
@@ -54,6 +55,9 @@ if(!options.tenant ||
     process.exit(1);
 } else if(options.randomresource && options.resource) {
     console.log("Can not specify choose a random resource and specify an actual resource.");
+    process.exit(1);
+} else if(options.resource && options.resourcematch) {
+    console.log("Can not specify a resource match pattern when specifying a specific resource.");
     process.exit(1);
 }
 
@@ -109,6 +113,7 @@ function process_generate_client(next) {
     next();
 }
 
+
 function process_determine_resource(next) {
     if(options.randomresource) {
         armCompute.vmInfoOperations.list_vms(client, options.resourcegrp, function(err, result) {
@@ -119,7 +124,32 @@ function process_determine_resource(next) {
                     if(err) {
                         throw err;
                     } else {
-                        resource = dingoUtils.random_array_entry(result);
+                        // Check to see if the list of resources is filtered by name
+                        if(options.resourcematch) {
+                            var vms = result;
+                            dingoUtils.filter_vm_list(options.resourcematch, vms, function(err, result) {
+                                if(err) {
+                                    throw err;
+                                } else {
+                                    if(result.length == 0) {
+                                        throw new Error('No resources matched.');
+                                    } else {
+                                        var tmp = dingoUtils.random_array_entry(result)
+                                        for(var i = 0; i < vms.length; i++) {
+                                            if(vms[i] == tmp) {
+                                                resource = tmp;
+                                                break;
+                                            }
+                                        }
+                                        if(!resource) {
+                                            throw new Error('Resource match pattern specified did not find a valid resource');
+                                        }
+                                    }
+                                } 
+                            });
+                        } else {
+                            resource = dingoUtils.random_array_entry(result);
+                        }
                     }
                 });
             }
