@@ -67,13 +67,13 @@ var vmFunctionEnd = null;
 var operationDelay;
 switch(options.operation) {
     case 'start':
-        vmFunction = armCompute.vmOperations.start_vm;
+        vmFunctionBegin = armCompute.vmOperations.start_vm;
         break;
     case 'stop':
-        vmFunction = armCompute.vmOperations.stop_vm;
+        vmFunctionBegin = armCompute.vmOperations.stop_vm;
         break;
     case 'restart':
-        vmFunction = armCompute.vmOperations.restart_vm;
+        vmFunctionBegin = armCompute.vmOperations.restart_vm;
         break;
     case 'powercycle':
         vmFunctionBegin = armCompute.vmOperations.stop_vm;
