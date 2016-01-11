@@ -38,8 +38,9 @@ var options = require('yargs')
     .option('g', { alias: 'resourcegrp', describe: 'The resource group to operate in.', demand: true, type: 'string' } )
     .option('r', { alias: 'resource', describe: 'The name of the resource to operate on.', type: 'string' } )
     .option('a', { alias: 'randomresource', describe: 'Choose a resource at random from the resource group.  (Limited to VMs)', type: 'boolean' })
-    .option('o', { alias: 'operation', describe: 'The operation to perform on the specified resource.  Possible are: start, stop, restart.', demand: true, type: 'string' })
+    .option('o', { alias: 'operation', describe: 'The operation to perform on the specified resource.  Possible are: start, stop, restart, powercycle.', demand: true, type: 'string' })
     .option('m', { alias: 'resourcematch', describe: 'A regular expression to match / filter the list of random resources.', type: 'string' })
+    .option('d', {  alias: 'delay', describe: 'The delay to wait between operations which require two steps.  Can be an integer or a range (range will be random in the range).  Default will be 60 seconds.', type: 'string' })
     .help('?')
     .alias('?', 'help')
     .argv;
@@ -61,7 +62,9 @@ if(!options.tenant ||
     process.exit(1);
 }
 
-var vmFunction = null;
+var vmFunctionBegin = null;
+var vmFunctionEnd = null;
+var operationDelay;
 switch(options.operation) {
     case 'start':
         vmFunction = armCompute.vmOperations.start_vm;
@@ -72,8 +75,42 @@ switch(options.operation) {
     case 'restart':
         vmFunction = armCompute.vmOperations.restart_vm;
         break;
+    case 'powercycle':
+        vmFunctionBegin = armCompute.vmOperations.stop_vm;
+        vmFunctionEnd = armCompute.vmOperations.start_vm;
+        break;
     default:
         throw new Error('Unsupported operation.  Operation: ' + options.operation);
+}
+
+// if we have a compound operation (powercycle, for instance), then 
+// check for duration to wait between start and end.  If no value 
+// specified, the default is 60 seconds.
+if(vmFunctionEnd) {
+    if(options.delay) {
+        var a = parseInt(options.delay);
+        if(a.toString() == options.delay) {
+            operationDelay = a;
+        } else {
+            var range = options.delay.split('-');
+            if(range.length == 2) {
+                if((parseInt((range[0]).toString() != range[0])) ||
+                        (parseInt(range[1]).toString() != range[1])) {
+                    console.log('A duration range requires two numbers of the form X-Y.');
+                    process.exit(1);
+                } else {
+                    var min = parseInt(range[0]), max = parseInt(range[1]);
+                    if((max < min) || (max == min)) {
+                        console.log('A range must be specified as MIN-MAX, and the two values can not be equal.');
+                        process.exit(1);
+                    }
+                    operationDelay = Math.floor(Math.random() * (max - min)) + min;
+                }
+            }
+        }
+    } else {
+        operationDelay = 60;
+    }
 }
 
 // Functions and variables to control activity on resources.
@@ -162,13 +199,37 @@ function process_determine_resource(next) {
     }
 }
 
-function process_perform_operation(next) {
+function process_perform_begin_operation(next) {
     console.log("Start operation: " + options.operation);
-    vmFunction(client, options.resourcegrp, resource, function(err, result) {
+    vmFunctionBegin(client, options.resourcegrp, resource, function(err, result) {
         if(err) {
             throw err;            
         } else {
             console.log("Operation " + options.operation + " succeeded.");
+        }
+        if(next) {
+            next();
+        }
+    });
+}
+
+function process_pause_between_operations(next) {
+    console.log("Pausing for " + operationDelay + " seconds.");
+    setTimeout(function() {
+                    next();
+                }, operationDelay * 1000);
+}
+
+function process_perform_end_operation(next) {
+    console.log("Finishing operation: " + options.operation);
+    vmFunctionEnd(client, options.resourcegrp, resource, function(err, result) {
+        if(err) {
+            throw err;
+        } else {
+            console.log("Finishing operation " + options.operation + " succeeded.");
+        }
+        if(next) {
+            next();
         }
     });
 }
@@ -178,7 +239,14 @@ asyncOps = [
     process_gather_credentials,
     process_generate_client,
     process_determine_resource,
-    process_perform_operation
+    process_perform_begin_operation
 ];
+
+// Do we have an operation that has a begin and an end?  If so, then
+// add the pause and end operation steps.
+if(vmFunctionEnd) {
+    asyncOps.push(process_pause_between_operations);
+    asyncOps.push(process_perform_end_operation);
+}
 
 async.series(asyncOps);
