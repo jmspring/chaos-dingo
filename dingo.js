@@ -25,6 +25,7 @@ var ComputeManagementClient = require('azure-arm-compute');
 
 var armCompute = require('./arm_compute_ops');
 var azureConstants = require('./azure_constants');
+var dingoUtils = require('./dingo_utils');
 
 var operationTimeout = 60;  // time to wait before we timeout of an operation
 
@@ -35,7 +36,8 @@ var options = require('yargs')
     .option('c', { alias: 'client', describe: 'Client ID.', demand: true, type: 'string' } )
     .option('p', { alias: 'password', describe: 'Secret associated with the Client ID.', demand: true, type: 'string' } )
     .option('g', { alias: 'resourcegrp', describe: 'The resource group to operate in.', demand: true, type: 'string' } )
-    .option('r', { alias: 'resource', describe: 'The name of the resource to operate on.', demand: true, type: 'string' } )
+    .option('r', { alias: 'resource', describe: 'The name of the resource to operate on.', type: 'string' } )
+    .option('a', { alias: 'randomresource', describe: 'Choose a resource at random from the resource group.  (Limited to VMs)', type: 'boolean' })
     .option('o', { alias: 'operation', describe: 'The operation to perform on the specified resource.  Possible are: start, stop, restart.', demand: true, type: 'string' })
     .help('?')
     .alias('?', 'help')
@@ -45,57 +47,108 @@ if(!options.tenant ||
         !options.subscription ||
         !options.client ||
         !options.password ||
-        !options.resourcegrp ||
-        !options.resource) {
+        !options.resourcegrp) {
+    process.exit(1);
+} else if(!options.randomresource && !options.resource) {
+    console.log("Either a resource is required or select one at random.");
+    process.exit(1);
+} else if(options.randomresource && options.resource) {
+    console.log("Can not specify choose a random resource and specify an actual resource.");
     process.exit(1);
 }
 
 var vmFunction = null;
 switch(options.operation) {
     case 'start':
-        vmFunction = armCompute.start_vm;
+        vmFunction = armCompute.vmOperations.start_vm;
         break;
     case 'stop':
-        vmFunction = armCompute.stop_vm;
+        vmFunction = armCompute.vmOperations.stop_vm;
         break;
     case 'restart':
-        vmFunction = armCompute.restart_vm;
+        vmFunction = armCompute.vmOperations.restart_vm;
         break;
     default:
         throw new Error('Unsupported operation.  Operation: ' + options.operation);
 }
 
+// Functions and variables to control activity on resources.
+// It is assumed they are placed into an async.series.
 var client;
 var response;
 var credentials;
-var context = new adalNode.AuthenticationContext(azureConstants.AUTHORIZATION_ENDPOINT + options.tenant);
-async.series([
-    function (next) {
-        context.acquireTokenWithClientCredentials(azureConstants.ARM_RESOURCE_ENDPOINT, 
-                                                  options.client, 
-                                                  options.password,
-                                                  function(err, result){
-            if (err) throw err;
-            response = result;
-            next();
-        });
-    },
-    function (next) {
-        credentials = new azureCommon.TokenCloudCredentials({
+var resource;
+
+function process_authenticate_user(next) {
+
+    console.log("Acquiring token.");    
+    var context = new adalNode.AuthenticationContext(azureConstants.AUTHORIZATION_ENDPOINT + options.tenant);
+    context.acquireTokenWithClientCredentials(azureConstants.ARM_RESOURCE_ENDPOINT, 
+                                              options.client, 
+                                              options.password,
+                                              function(err, result){
+        if (err) throw err;
+        response = result;
+        next();
+    });
+}
+
+function process_gather_credentials(next) { 
+    console.log("Gathering credentials.");
+    credentials = new azureCommon.TokenCloudCredentials({
             subscriptionId : options.subscription,
             authorizationScheme : response.tokenType,
             token : response.accessToken
-        });
+    });
+    next();
+}
 
-        next();
-    },
-    function (next) {
-        vmFunction(credentials, options.resourcegrp, options.resource, function(err, result) {
+function process_generate_client(next) {
+    console.log("Generate client.");
+    client = new ComputeManagementClient(credentials, options.subscription);
+    next();
+}
+
+function process_determine_resource(next) {
+    if(options.randomresource) {
+        armCompute.vmInfoOperations.list_vms(client, options.resourcegrp, function(err, result) {
             if(err) {
-                throw err;            
+                throw err;
             } else {
-                console.log("Operation " + options.operation + " succeeded.");
+                dingoUtils.parse_vm_list(result, function(err, result) {
+                    if(err) {
+                        throw err;
+                    } else {
+                        resource = dingoUtils.random_array_entry(result);
+                    }
+                });
             }
-        });
+            console.log("Resource to perform operation on: " + resource);
+            next();
+        });    
+    } else {
+        resource = options.resource;
+        console.log("Resource to perform operation on: " + resource);
     }
-]);
+}
+
+function process_perform_operation(next) {
+    console.log("Start operation: " + options.operation);
+    vmFunction(client, options.resourcegrp, resource, function(err, result) {
+        if(err) {
+            throw err;            
+        } else {
+            console.log("Operation " + options.operation + " succeeded.");
+        }
+    });
+}
+
+asyncOps = [
+    process_authenticate_user,
+    process_gather_credentials,
+    process_generate_client,
+    process_determine_resource,
+    process_perform_operation
+];
+
+async.series(asyncOps);

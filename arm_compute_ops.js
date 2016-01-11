@@ -7,9 +7,8 @@ var AZURE_CONSTANTS = require('./azure_constants');
 
 var exports = module.exports = {};
 
-function performVmOperation(operation, credentials, subscriptionId, resourceGroup, resource, callback) {
-    if(credentials && resourceGroup && resource) {
-        var client = new ComputeManagementClient(credentials, subscriptionId);
+function performVmOperation(operation, client, resourceGroup, resource, callback) {
+    if(client && resourceGroup && resource) {
         if(operation === 'restart') {
             client.virtualMachines.restart(resourceGroup, resource, callback);
         } else if(operation === 'start') {
@@ -17,29 +16,42 @@ function performVmOperation(operation, credentials, subscriptionId, resourceGrou
         } else if(operation === 'stop') {
             client.virtualMachines.powerOff(resourceGroup, resource, callback);
         } else {
+            var err = new Error('Unsupported operation: ' + operation);
             if(callback) {
-                callback('Unsupported operation: ' + operation);
+                callback(err);
             } else {
-                throw new Error('Unsupported operation: ' + operation);
+                throw err;
             }
         }
     } else {
+        var err = new Error('One or more required parameters null.  Operation: ' + operation);
         if(callback) {
-            callback('One or more required parameters null.  Operation: ' + operation);
+            callback(err);
         } else {
-            throw new Error('One or more required parameters null.  Operation: ' + operation);
+            throw err;
         }
     }
 }
 
-exports.restart_vm = function(credentials, resourceGroup, resource, callback) {
-    performVmOperation('restart', credentials, resourceGroup, resource, callback);
+exports.vmOperations = {};
+exports.vmOperations.restart_vm = function(client, resourceGroup, resource, callback) {
+    performVmOperation('restart', client, resourceGroup, resource, callback);
 };
 
-exports.start_vm = function(credentials, resourceGroup, resource, callback) {
-    performVmOperation('start', credentials, resourceGroup, resource, callback);
+exports.vmOperations.start_vm = function(client, resourceGroup, resource, callback) {
+    performVmOperation('start', client, resourceGroup, resource, callback);
 };
 
-exports.stop_vm = function(credentials, resourceGroup, resource, callback) {
-    performVmOperation('stop', credentials, resourceGroup, resource, callback);
+exports.vmOperations.stop_vm = function(client, resourceGroup, resource, callback) {
+    performVmOperation('stop', client, resourceGroup, resource, callback);
 };
+
+
+exports.vmInfoOperations = {};
+exports.vmInfoOperations.list_vms = function(client, resourceGroup, callback) {
+    if(client && resourceGroup) {
+        client.virtualMachines.list(resourceGroup, callback)
+    } else {
+        callback(new Error('list_vms: One or more required inputs missing.'));
+    }
+}
