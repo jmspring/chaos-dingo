@@ -26,8 +26,7 @@ var ComputeManagementClient = require('azure-arm-compute');
 var armCompute = require('./arm_compute_ops');
 var azureConstants = require('./azure_constants');
 var dingoUtils = require('./dingo_utils');
-
-var operationTimeout = 60;  // time to wait before we timeout of an operation
+var DingoJob = require('./dingo_job').DingoJob;
 
 var options = require('yargs')
     .usage('Usage $0 [options]')
@@ -40,7 +39,7 @@ var options = require('yargs')
     .option('a', { alias: 'randomresource', describe: 'Choose a resource at random from the resource group.  (Limited to VMs)', type: 'boolean' })
     .option('o', { alias: 'operation', describe: 'The operation to perform on the specified resource.  Possible are: start, stop, restart, powercycle.', demand: true, type: 'string' })
     .option('m', { alias: 'resourcematch', describe: 'A regular expression to match / filter the list of random resources.', type: 'string' })
-    .option('d', {  alias: 'delay', describe: 'The delay to wait between operations which require two steps.  Can be an integer or a range (range will be random in the range).  Default will be 60 seconds.', type: 'string' })
+    .option('u', { alias: 'duration', describe: 'The time to wait between start/stop type operations requiring two actual operations.  Can be an integer or a range (range will be random in the range).  Default will be 60 seconds.', type: 'string' })
     .help('?')
     .alias('?', 'help')
     .argv;
@@ -62,56 +61,17 @@ if(!options.tenant ||
     process.exit(1);
 }
 
-var vmFunctionBegin = null;
-var vmFunctionEnd = null;
-var operationDelay;
-switch(options.operation) {
-    case 'start':
-        vmFunctionBegin = armCompute.vmOperations.start_vm;
-        break;
-    case 'stop':
-        vmFunctionBegin = armCompute.vmOperations.stop_vm;
-        break;
-    case 'restart':
-        vmFunctionBegin = armCompute.vmOperations.restart_vm;
-        break;
-    case 'powercycle':
-        vmFunctionBegin = armCompute.vmOperations.stop_vm;
-        vmFunctionEnd = armCompute.vmOperations.start_vm;
-        break;
-    default:
-        throw new Error('Unsupported operation.  Operation: ' + options.operation);
+var resource;
+if(options.randomresource) {
+    resource = { 'random': true }
+    if(options.resourcematch) {
+        resource['match'] = options.resourcematch;
+    }
+} else {
+    resource = options.resource;
 }
 
-// if we have a compound operation (powercycle, for instance), then 
-// check for duration to wait between start and end.  If no value 
-// specified, the default is 60 seconds.
-if(vmFunctionEnd) {
-    if(options.delay) {
-        var a = parseInt(options.delay);
-        if(a.toString() == options.delay) {
-            operationDelay = a;
-        } else {
-            var range = options.delay.split('-');
-            if(range.length == 2) {
-                if((parseInt((range[0]).toString() != range[0])) ||
-                        (parseInt(range[1]).toString() != range[1])) {
-                    console.log('A duration range requires two numbers of the form X-Y.');
-                    process.exit(1);
-                } else {
-                    var min = parseInt(range[0]), max = parseInt(range[1]);
-                    if((max < min) || (max == min)) {
-                        console.log('A range must be specified as MIN-MAX, and the two values can not be equal.');
-                        process.exit(1);
-                    }
-                    operationDelay = Math.floor(Math.random() * (max - min)) + min;
-                }
-            }
-        }
-    } else {
-        operationDelay = 60;
-    }
-}
+var job = new DingoJob('vm', options.operation, options.resourcegrp, resource, { duration: options.duration });
 
 // Functions and variables to control activity on resources.
 // It is assumed they are placed into an async.series.
@@ -152,7 +112,7 @@ function process_generate_client(next) {
 
 
 function process_determine_resource(next) {
-    if(options.randomresource) {
+    if(job.getResource() == null) {
         armCompute.vmInfoOperations.list_vms(client, options.resourcegrp, function(err, result) {
             if(err) {
                 throw err;
@@ -162,9 +122,9 @@ function process_determine_resource(next) {
                         throw err;
                     } else {
                         // Check to see if the list of resources is filtered by name
-                        if(options.resourcematch) {
+                        if(job.getResourceMatch() != null) {
                             var vms = result;
-                            dingoUtils.filter_vm_list(options.resourcematch, vms, function(err, result) {
+                            dingoUtils.filter_vm_list(job.getResourceMatch(), vms, function(err, result) {
                                 if(err) {
                                     throw err;
                                 } else {
@@ -201,7 +161,7 @@ function process_determine_resource(next) {
 
 function process_perform_begin_operation(next) {
     console.log("Start operation: " + options.operation);
-    vmFunctionBegin(client, options.resourcegrp, resource, function(err, result) {
+    job.performOperation(0, client, resource, function(err, result) {
         if(err) {
             throw err;            
         } else {
@@ -214,15 +174,17 @@ function process_perform_begin_operation(next) {
 }
 
 function process_pause_between_operations(next) {
-    console.log("Pausing for " + operationDelay + " seconds.");
+    var duration = job.getOperationDuration();
+    console.log("Pausing for " + duration + " seconds.");
+    
     setTimeout(function() {
                     next();
-                }, operationDelay * 1000);
+                }, duration * 1000);
 }
 
 function process_perform_end_operation(next) {
     console.log("Finishing operation: " + options.operation);
-    vmFunctionEnd(client, options.resourcegrp, resource, function(err, result) {
+    job.performOperation(1, client, resource, function(err, result) {
         if(err) {
             throw err;
         } else {
@@ -244,7 +206,7 @@ asyncOps = [
 
 // Do we have an operation that has a begin and an end?  If so, then
 // add the pause and end operation steps.
-if(vmFunctionEnd) {
+if(job.isMultistep()) {
     asyncOps.push(process_pause_between_operations);
     asyncOps.push(process_perform_end_operation);
 }
