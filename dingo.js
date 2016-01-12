@@ -18,15 +18,8 @@
 //          Note, currently only the password method is supported.
 
 // modules
-var adalNode = require('adal-node');
-var async = require('async');
-var azureCommon = require('azure-common');
-var ComputeManagementClient = require('azure-arm-compute');
-
-var armCompute = require('./arm_compute_ops');
-var azureConstants = require('./azure_constants');
-var dingoUtils = require('./dingo_utils');
 var DingoJob = require('./dingo_job').DingoJob;
+var DingoJobPipeline = require('./dingo_job_pipeline').DingoJobPipeline;
 
 var options = require('yargs')
     .usage('Usage $0 [options]')
@@ -71,144 +64,16 @@ if(options.randomresource) {
     resource = options.resource;
 }
 
+// perform the operation
 var job = new DingoJob('vm', options.operation, options.resourcegrp, resource, { duration: options.duration });
-
-// Functions and variables to control activity on resources.
-// It is assumed they are placed into an async.series.
-var client;
-var response;
-var credentials;
-var resource;
-
-function process_authenticate_user(next) {
-
-    console.log("Acquiring token.");    
-    var context = new adalNode.AuthenticationContext(azureConstants.AUTHORIZATION_ENDPOINT + options.tenant);
-    context.acquireTokenWithClientCredentials(azureConstants.ARM_RESOURCE_ENDPOINT, 
-                                              options.client, 
-                                              options.password,
-                                              function(err, result){
-        if (err) throw err;
-        response = result;
-        next();
-    });
-}
-
-function process_gather_credentials(next) { 
-    console.log("Gathering credentials.");
-    credentials = new azureCommon.TokenCloudCredentials({
-            subscriptionId : options.subscription,
-            authorizationScheme : response.tokenType,
-            token : response.accessToken
-    });
-    next();
-}
-
-function process_generate_client(next) {
-    console.log("Generate client.");
-    client = new ComputeManagementClient(credentials, options.subscription);
-    next();
-}
-
-
-function process_determine_resource(next) {
-    if(job.getResource() == null) {
-        armCompute.vmInfoOperations.list_vms(client, options.resourcegrp, function(err, result) {
-            if(err) {
-                throw err;
-            } else {
-                dingoUtils.parse_vm_list(result, function(err, result) {
-                    if(err) {
-                        throw err;
-                    } else {
-                        // Check to see if the list of resources is filtered by name
-                        if(job.getResourceMatch() != null) {
-                            var vms = result;
-                            dingoUtils.filter_vm_list(job.getResourceMatch(), vms, function(err, result) {
-                                if(err) {
-                                    throw err;
-                                } else {
-                                    if(result.length == 0) {
-                                        throw new Error('No resources matched.');
-                                    } else {
-                                        var tmp = dingoUtils.random_array_entry(result)
-                                        for(var i = 0; i < vms.length; i++) {
-                                            if(vms[i] == tmp) {
-                                                resource = tmp;
-                                                break;
-                                            }
-                                        }
-                                        if(!resource) {
-                                            throw new Error('Resource match pattern specified did not find a valid resource');
-                                        }
-                                    }
-                                } 
-                            });
-                        } else {
-                            resource = dingoUtils.random_array_entry(result);
-                        }
-                    }
-                });
-            }
-            console.log("Resource to perform operation on: " + resource);
-            next();
-        });    
+var pipeline = new DingoJobPipeline(options.tenant, options.subscription, options.client, options.password, job);
+pipeline.go(function(err, result) {
+    if(err) {
+        console.log('Attempt to process job failed.  Error:' + err);
+        process.exit(1);
     } else {
-        resource = options.resource;
-        console.log("Resource to perform operation on: " + resource);
+        if(result) {
+            console.log('Processing of job completed with status: ' + result);
+        }
     }
-}
-
-function process_perform_begin_operation(next) {
-    console.log("Start operation: " + options.operation);
-    job.performOperation(0, client, resource, function(err, result) {
-        if(err) {
-            throw err;            
-        } else {
-            console.log("Operation " + options.operation + " succeeded.");
-        }
-        if(next) {
-            next();
-        }
-    });
-}
-
-function process_pause_between_operations(next) {
-    var duration = job.getOperationDuration();
-    console.log("Pausing for " + duration + " seconds.");
-    
-    setTimeout(function() {
-                    next();
-                }, duration * 1000);
-}
-
-function process_perform_end_operation(next) {
-    console.log("Finishing operation: " + options.operation);
-    job.performOperation(1, client, resource, function(err, result) {
-        if(err) {
-            throw err;
-        } else {
-            console.log("Finishing operation " + options.operation + " succeeded.");
-        }
-        if(next) {
-            next();
-        }
-    });
-}
-
-asyncOps = [
-    process_authenticate_user,
-    process_gather_credentials,
-    process_generate_client,
-    process_determine_resource,
-    process_perform_begin_operation
-];
-
-// Do we have an operation that has a begin and an end?  If so, then
-// add the pause and end operation steps.
-if(job.isMultistep()) {
-    asyncOps.push(process_pause_between_operations);
-    asyncOps.push(process_perform_end_operation);
-}
-
-async.series(asyncOps);
+});

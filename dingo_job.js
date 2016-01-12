@@ -97,6 +97,16 @@ DingoJob.prototype.isMultistep = function() {
     }
 }
 
+// How many steps are there in this job?
+DingoJob.prototype.getStepCount = function() {
+    if(typeof this.type.operations[this.operation].op == 'function') {
+        return 1;
+    } else {
+        return this.type.operations[this.operation].op.length;
+    }
+}
+
+
 // For multistep operations, retrieve the duration in between each step
 DingoJob.prototype.getOperationDuration = function() {
     var result = 0;
