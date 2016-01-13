@@ -243,7 +243,7 @@ DingoJob.prototype.dumpJob = function(indent) {
     }
     console.log(offset + "Job:")
     console.log(offset + "    Type:           " + this.type);
-    console.log(offset + "    Operation:      " + this.operation);
+    console.log(offset + "    Operation:      " + (this.randomOperation ? "*" : this.operation));
     console.log(offset + "    Resource Group: " + this.resourceGroup);
     console.log(offset + "    Resource:       " + (!this.resource ? "*" : this.resource));
     if(this.resourceMatch) {
