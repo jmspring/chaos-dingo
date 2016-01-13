@@ -18,62 +18,29 @@
 //          Note, currently only the password method is supported.
 
 // modules
-var DingoJob = require('./dingo_job').DingoJob;
-var DingoJobPipeline = require('./dingo_job_pipeline').DingoJobPipeline;
+var DingoTest = require('./dingo_test').DingoTest;
 
 var options = require('yargs')
     .usage('Usage $0 [options]')
-    .option('t', { alias: 'tenant', describe: 'Tenant ID.', demand: true, type: 'string' } )
-    .option('s', { alias: 'subscription', describe: 'Subscription ID.', demand: true, type: 'string' } )
-    .option('c', { alias: 'client', describe: 'Client ID.', demand: true, type: 'string' } )
-    .option('p', { alias: 'password', describe: 'Secret associated with the Client ID.', demand: true, type: 'string' } )
-    .option('g', { alias: 'resourcegrp', describe: 'The resource group to operate in.', demand: true, type: 'string' } )
+    .option('t', { alias: 'tenant', describe: 'Tenant ID.', type: 'string' } )
+    .option('s', { alias: 'subscription', describe: 'Subscription ID.', type: 'string' } )
+    .option('c', { alias: 'client', describe: 'Client ID.', type: 'string' } )
+    .option('p', { alias: 'password', describe: 'Secret associated with the Client ID.', type: 'string' } )
+    .option('g', { alias: 'resourcegrp', describe: 'The resource group to operate in.', type: 'string' } )
     .option('r', { alias: 'resource', describe: 'The name of the resource to operate on.', type: 'string' } )
     .option('a', { alias: 'randomresource', describe: 'Choose a resource at random from the resource group.  (Limited to VMs)', type: 'boolean' })
-    .option('o', { alias: 'operation', describe: 'The operation to perform on the specified resource.  Possible are: start, stop, restart, powercycle.', demand: true, type: 'string' })
+    .option('o', { alias: 'operation', describe: 'The operation to perform on the specified resource.  Possible are: start, stop, restart, powercycle.', type: 'string' })
     .option('m', { alias: 'resourcematch', describe: 'A regular expression to match / filter the list of random resources.', type: 'string' })
     .option('u', { alias: 'duration', describe: 'The time to wait between start/stop type operations requiring two actual operations.  Can be an integer or a range (range will be random in the range).  Default will be 60 seconds.', type: 'string' })
+    .option('n', { alias: 'testduration', describe: 'The total time to run multiple tests.  Note that the time is not absolute, if the current test runs long the process will stop after that test.  Can be an integer or a range (range will be random in the range).', type: 'string' })
+    .option('d', { alias: 'testdelay', describe: 'The time to wait between each individual test.  If when time to run the next test and the total time has been exceeded, the process will exit.    Can be an integer or a range (range will be random in the range).  Default will be 60 seconds.', type: 'string' })
+    .option('z', { alias: 'testrandom', describe: 'Run tests in random order.', type: 'boolean' })
+    .option('v', { alias: 'resourcetype', describe: 'What type of resource to operate on.  Currently only \'vm\' supported.', type: 'string', default: 'vm' })
+    .option('f', { alias: 'testfile', describe: 'JSON file defining test to run.  Note that any arguments specified on the command line may over ride values in the test file.', type: 'string' })
     .help('?')
     .alias('?', 'help')
     .argv;
 
-if(!options.tenant ||
-        !options.subscription ||
-        !options.client ||
-        !options.password ||
-        !options.resourcegrp) {
-    process.exit(1);
-} else if(!options.randomresource && !options.resource) {
-    console.log("Either a resource is required or select one at random.");
-    process.exit(1);
-} else if(options.randomresource && options.resource) {
-    console.log("Can not specify choose a random resource and specify an actual resource.");
-    process.exit(1);
-} else if(options.resource && options.resourcematch) {
-    console.log("Can not specify a resource match pattern when specifying a specific resource.");
-    process.exit(1);
-}
-
-var resource;
-if(options.randomresource) {
-    resource = { 'random': true }
-    if(options.resourcematch) {
-        resource['match'] = options.resourcematch;
-    }
-} else {
-    resource = options.resource;
-}
-
 // perform the operation
-var job = new DingoJob('vm', options.operation, options.resourcegrp, resource, { duration: options.duration });
-var pipeline = new DingoJobPipeline(options.tenant, options.subscription, options.client, options.password, job);
-pipeline.go(function(err, result) {
-    if(err) {
-        console.log('Attempt to process job failed.  Error:' + err);
-        process.exit(1);
-    } else {
-        if(result) {
-            console.log('Processing of job completed with status: ' + result);
-        }
-    }
-});
+var test = DingoTest.generateTest(options);
+test.go();

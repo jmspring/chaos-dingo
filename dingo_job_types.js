@@ -14,7 +14,8 @@ exports.vm = {
             op: armCompute.vmOperations.stop_vm
         },
         restart: {
-            op: armCompute.vmOperations.restart_vm
+            op: armCompute.vmOperations.restart_vm,
+            allowRandom: true
         },
         powercycle: {
             op: [ armCompute.vmOperations.stop_vm, armCompute.vmOperations.start_vm ],
@@ -24,7 +25,8 @@ exports.vm = {
                     defaultValue: 60,
                     includeInCall: false
                 }
-            }       
+            },
+            allowRandom: true
         }
     }
 };

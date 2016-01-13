@@ -101,6 +101,7 @@ DingoJobPipeline.prototype.determine_resource = function(next) {
     } else {
         this.resource = this.job.getResource();
         console.log('Resource to perform operation on: ' + this.resource);
+        next();
     }
 }
 
