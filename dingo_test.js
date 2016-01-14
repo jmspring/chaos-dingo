@@ -70,7 +70,7 @@ DingoTest.generateTest = function(args) {
     var clientId = args.client;
     var clientSecret = args.password;
     
-    var testDuration = dingoUtils.parse_argument('int-range', args.testduration, 0);
+    var testDuration = dingoUtils.parse_argument('int-range', args.testduration, 60);
     var testDelay = dingoUtils.parse_argument('int-range', args.testdelay, 60);
     var randomOrder = args.testrandom;
     
@@ -128,7 +128,7 @@ DingoTest.generateTest = function(args) {
         var resource = (args.resource == '*' ? null : args.resource);
         var resourceMatch = args.resourcematch;
         var randomResource = (args.randomresource ? true : (resource == '*' ? true : false));
-        var duration = dingoUtils.parse_argument('int-range', (args.duration ? args.duration : (j.duration ? j.duration : 60)), 60);
+        var duration = dingoUtils.parse_argument('int-range', args.duration, 60);
         if(!type || !operation || !resourceGroup) {
             throw new Error('Required parameters not specified.');
         }
