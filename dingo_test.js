@@ -108,14 +108,18 @@ DingoTest.generateTest = function(args) {
             throw new Error('\'jobs\' section of test file required and conform to the valid format.');
         }
         var jobList = testJson.jobs;
+        
+console.log("POOP");
+console.log("---- " + args.resourceMa);
         for(var i = 0; i < jobList.length; i++) {
             var j = jobList[i];
+console.log("++++ " + j.resourceMatch);
             jobs.push({
                 type: j.type,
                 operation: j.operation,
                 resourceGroup: (args.resourcegrp ? args.resourcegrp : j.resourceGroup),
                 resource: (args.resource ? (args.resource == '*' ? null : args.resource) : (j.resource == "*" ? null : j.resource)),
-                resourceMatch: (args.resourcematch ? args.resourcematch : j.resourcematch),
+                resourceMatch: (args.resourcematch ? args.resourcematch : j.resourceMatch),
                 randomResource: (args.randomresource ? true : (j.resource == '*' ? true : false)),
                 duration: dingoUtils.parse_argument('int-range', (args.duration ? args.duration : (j.duration ? j.duration : 60)), 60)
             });
