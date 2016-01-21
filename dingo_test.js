@@ -127,7 +127,7 @@ DingoTest.generateTest = function(args) {
         var resourceGroup = args.resourcegrp;
         var resource = (args.resource == '*' ? null : args.resource);
         var resourceMatch = args.resourcematch;
-        var randomResource = (args.randomresource ? true : (resource == '*' ? true : false));
+        var randomResource = (args.randomresource ? true : (resource == null ? true : false));
         var duration = dingoUtils.parse_argument('int-range', args.duration, 60);
         if(!type || !operation || !resourceGroup) {
             throw new Error('Required parameters not specified.');
