@@ -129,10 +129,24 @@ DingoTest.generateTest = function(args) {
         var resourceMatch = args.resourcematch;
         var randomResource = (args.randomresource ? true : (resource == '*' ? true : false));
         var duration = dingoUtils.parse_argument('int-range', args.duration, 60);
-        if(!type || !operation || !resourceGroup) {
-            throw new Error('Required parameters not specified.');
+        if(!type || !operation || !resourceGroup || (!resource && !resourceMatch )) {
+	    var msg = 'One or more equired parameters were not specified. You must provide:\n'
+	    if (!type) {
+		msg = msg + '\tResource Type (-v, --resource-type';
+	    }
+	    if (!operation) {
+		msg = msg + '\tOperation (-o, --operation';
+	    }
+	    if (!resourceGroup) {
+		msg = msg + '\tResource Group (-g, --resourcegrp';
+	    }
+	    if (!resource && !resourceMatch ) {
+		msg = msg + '\tEither a resource name (-r, --resource) or a regular expression to match resources (-m, --resourcematch)';
+	    }
+            console.log(msg);
+	    process.exit(1)
         }
-                
+
         jobs.push({
             type: type,
             operation: operation,
