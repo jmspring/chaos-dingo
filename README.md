@@ -16,7 +16,7 @@ Principal with permissions to perform actions on those resources within the
 Resource Group.
 
 If you aren't familiar with what a Service Principal is, I recommend starting
-by taking a look [here](http://innerdot.com/tag/active-directory.html).
+by taking a look [here](http://innerdot.com/azure/a-gaffers-guide-to-azure-service-principals-and-applications).
 
 There are two ways to interact with the Chaos Dingo, via the command line or
 via a test file.  From the command line, you are limited to working with a
