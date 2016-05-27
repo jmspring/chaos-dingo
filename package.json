@@ -7,7 +7,7 @@
     "start": "node dingo.js"
   },
   "dependencies": {
-    "azure-arm-compute": "git://github.com/jmspring/computeManagement2.git#master",
+    "azure-arm-compute": ">=0.18.0",
     "async": "*",
     "azure-common": "*",
     "ms-rest": "*",

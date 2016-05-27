@@ -109,11 +109,8 @@ DingoTest.generateTest = function(args) {
         }
         var jobList = testJson.jobs;
         
-console.log("POOP");
-console.log("---- " + args.resourceMa);
         for(var i = 0; i < jobList.length; i++) {
             var j = jobList[i];
-console.log("++++ " + j.resourceMatch);
             jobs.push({
                 type: j.type,
                 operation: j.operation,
