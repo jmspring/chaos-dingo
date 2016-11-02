@@ -9,19 +9,22 @@ var exports = module.exports = {};
 
 function performVmssOperation(operation, client, resourceGroup, resource, callback) {
     if (client && resourceGroup && resource) {
+
+        // This means we can specify the target VM instance inside a scale set -> e.g. in the test file -> "resource": "scaleset:0" otherwise it will select a random instance. 
+        let hasInstanceAppended = resource.split(':').length > 1;
+        let instanceId = -1;
+        if (hasInstanceAppended) {
+            instanceId = resource.split(':')[1];
+            resource = resource.split(':')[0];
+        }
+
         client.virtualMachineScaleSetVMs.list(resourceGroup, resource, (err, result) => {
             if (err) {
                 console.error(err);
                 throw err;
             }
 
-            // This means we can specify the target VM instance inside a scale set -> e.g. in the test file -> "resource": "scaleset:0" otherwise it will select a random instance. 
-            let hasInstanceAppended = resource.split(':').length > 1;
-            let instanceId = -1;
-            if (hasInstanceAppended) {
-                instanceId = resource.split(':')[1];
-                resource = resource.split(':')[0];
-            } else {
+            if (!hasInstanceAppended) {
                 let indexToKill = Math.floor(Math.random() * result.length);
                 instanceId = result[indexToKill].instanceId;
             }
