@@ -230,7 +230,7 @@ DingoJob.prototype.regenerateJob = function() {
             resource['match'] = this.resourceMatch;
         }
     } else {
-        resource = currentJob.resource;
+        resource = this.resource;
     }
     
     return new DingoJob(this.type, operation, this.resourceGroup, resource, this.extraArgs);
