@@ -1,3 +1,4 @@
+"use strict"
 // arm_compute_ops.js
 // 
 // Operations to perform on compute resources.  Only works with ARM resources.
