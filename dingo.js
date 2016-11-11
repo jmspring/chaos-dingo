@@ -1,3 +1,4 @@
+"use strict"
 // dingo.js
 // 
 // An implementation of a Chaos Monkey for Azure using the Azure NodeJS SDK.
